@@ -15,3 +15,7 @@ libraryDependencies ++= Seq(
 scalaVersion := "2.11.1"
 
 lazy val root = (project in file(".")).enablePlugins(PlayJava, SbtWeb)
+
+addCommandAlias("rb", "runMain backend.MainClusterManager backend 2560")
+
+addCommandAlias("rb2", "runMain backend.MainClusterManager backend 2561")
