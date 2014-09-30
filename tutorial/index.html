@@ -181,7 +181,7 @@ app.controller('Tweets', function($scope, $http, $timeout, Twitter) {
 <div>
     <h2>Add Websockets</h2>
 
-    <p>Websockets provide a  bi-directional, full-duplex communications channels over a single TCP connection.  They are created in Play using a normal route.  The difference is the controller returns a WebSocket instead of a Result.</p>
+    <p>Websockets provide a  bi-directional, full-duplex communication channel over a single TCP connection.  They are created in Play using a normal route.  The difference is the controller returns a WebSocket instead of a Result.</p>
     <p>1. Add a route for the websocket connection to the <a href="#code/conf/routes" class="shortcut">routes </a>file:</p>
 
     <p>GET &nbsp;&nbsp /ws     &nbsp;&nbsp;&nbsp;&nbsp;              controllers.Tweets.ws</p>
@@ -496,7 +496,7 @@ public class UserActor extends AbstractActor {
     <h2>Fetch Tweets Service - Akka Actor</h2>
 
     <p>Create a new actor that will act as the Global Fetch Tweet Service.  Note that the Play WS API requires a running Play Application because creating the client uses play.Play.application().  If it where used in the Akka Actor then the actor could not be run independent from the Play Application.</p>
-    <p>To get around this limitation we will use WSUtils that is defined in <a href="#code/app/utils/WSUtils.scala" class="shortcut">WSUtils</a> to call the twitter WS API.  It creates a WS client without requiring a Play Application.</p>
+    <p>To get around this limitation we will use TweetWS that is defined in <a href="#code/app/utils/TweetWS.java" class="shortcut">TweetWS.java</a> to call the twitter WS API.  It creates a WS client without requiring a Play Application.</p>
 
     <p><b>1. </b>Create a new TweetService.java file in <a href="#code/app/backend" class="shortcut">/app/backend</a> with the following Actor Definition (this copies the fetch tweets method out of the tweets controller):</p>
 <code><pre>
