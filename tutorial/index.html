@@ -960,6 +960,46 @@ akka {
 
     <code><pre>
     //move the message recieve block into receiveCommand
+
+      @Override
+    public PartialFunction<Object, BoxedUnit> receiveRecover() {
+        return null;
+    }
+
+    @Override
+    public PartialFunction<Object, BoxedUnit> receiveCommand() {
+        return ReceiveBuilder.
+                match(LoadTweet.class, loadTweet -> {
+
+                    System.out.println("Running a query for " + loadTweet.query);
+                    //!! Be sure to store user sender before calling the promise.  This captures
+                    //the sender so that it doesn't get closed over.
+                    ActorRef userSender = sender();
+                    F.Promise<JsonNode> fetchTweetsPromise = fetchTweets(loadTweet.getQuery());
+                    fetchTweetsPromise.onRedeem(jsonNode -> userSender.tell(new NextTweet(jsonNode), self()));
+                }).
+                matchAny(o -> System.out.println("received unknown message")).build();
+    }
+ </pre></code>
+
+ <p><b>2.</b>Add to the Akka config the following to setup the shared journal.  Inside the akka { config block add the following:</p>
+
+ <code><pre>
+ persistence {
+    journal {
+      plugin = "akka.persistence.journal.leveldb-shared"
+
+      leveldb-shared.store {
+        dir    = "target/shared-journal"
+         # DO NOT USE 'native = off' IN PRODUCTION !!!
+        native = off
+      }
+    }
+
+    snapshot-store {
+      local.dir = "target/snapshots"
+    }
+  }
  </pre></code>
 
 
