@@ -3,6 +3,7 @@ package actors;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
+import backend.journal.SharedJournalSetter;
 import play.Application;
 import play.Play;
 import play.Plugin;
@@ -34,5 +35,11 @@ public class Actors extends Plugin {
 
         //uncomment this line to enable the creation of the TweetService once TweetService has been created
         //tweetServiceClient = system.actorOf(TweetService.props(), "tweetServiceClient");
+
+
+        //The shared journal needs to be started on every node in the cluster.  This will (should) start it for
+        //Play - since this extension is used by Play.
+        //system.actorOf(SharedJournalSetter.props(), "shared-journal-setter");
+
     }
 }
