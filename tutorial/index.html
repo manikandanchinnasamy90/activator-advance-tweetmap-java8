@@ -633,6 +633,20 @@ public class TweetService extends AbstractActor {
         }
     }
 
+    public static final class NextTweet implements Serializable {
+        private JsonNode nextTweet;
+
+        public NextTweet() {
+        }
+
+        public NextTweet(JsonNode nextTweet) {
+            this.nextTweet = nextTweet;
+        }
+
+        public JsonNode getNextTweet() {
+            return nextTweet;
+        }
+
         private void writeObject(ObjectOutputStream out) throws IOException {
             BufferedWriter writer = null;
             try {
@@ -676,7 +690,7 @@ public class TweetService extends AbstractActor {
             }
         }
     }
-}
+ }
 
  </pre></code>
    
@@ -914,7 +928,41 @@ akka {
 
     <p>You should see the requests being balanced between both nodes.  If you stop one node the other node will take all the requests.  Then start the first node back-up and you should see it join the cluster and eventually requests will be routed to it as well.</p>
 
- </div>   
+ </div>
+
+
+<div>
+
+    <h2>Persistence</h2>
+
+    <p><b>1.</b> Start a clustered journal setter. In  <a href="#code/app/backend/MainClusterManager.java" class="shortcut">app/backend/MainClusterManager.java</a> initialize method start a journal setter:</p>
+
+    <code><pre>
+    system.actorOf(SharedJournalSetter.props(), "shared-journal-setter");
+ </pre></code>
+
+    <p><b>2.</b>The following changes in <a href="#code/app/backend/TweetService.java" class="shortcut">/app/backend/TweetService.java</a></p>
+
+    <code><pre>
+    //change TweetService from extending AbstractActor to AbstractPersistentActor
+    extends AbstractPersistentActor
+ </pre></code>
+
+    <code><pre>
+    //add a persistenceId..   A persistent actor must have an identifier that doesn't change across different actor incarnations
+    @Override
+    public String persistenceId() {
+        return "TweetService";
+    }
+ </pre></code>
+
+    <code><pre>
+    //move the message recieve block into receiveCommand
+ </pre></code>
+
+
+</div>
+
 
 
 </body>
