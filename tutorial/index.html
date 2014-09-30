@@ -26,10 +26,9 @@
     <h2>View the App</h2>
 
     <p>
-        Once the application has been compiled and the server started, your application can be accessed at: <a
-            href="http://localhost:9000" target="_blank">http://localhost:9000</a><br/>
+        Once the application has been compiled and the server started, your application can be accessed at: <a href="http://localhost:9000" target="_blank">http://localhost:9000</a><br/>
     </p>
-     <p>   Check in <a href="#run" class="shortcut">Run</a> to see the server status.<br/>
+     <p>Check in <a href="#run" class="shortcut">Run</a> to see the server status.<br/>
     </p>
 </div>
 <div>
@@ -507,15 +506,19 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.japi.pf.ReceiveBuilder;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import play.libs.F;
 import play.libs.Json;
-import play.libs.ws.WS;
 import play.libs.ws.WSResponse;
 import play.mvc.Http;
 import utils.TweetWS;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.List;
 import java.util.Random;
 
@@ -555,8 +558,8 @@ public class TweetService extends AbstractActor {
     * @param query
     * @return
     */
-    public static Promise&lt;JsonNode&gt; fetchTweets(String query) {
-        Promise&lt;WSResponse&gt; responsePromise = TweetWS.url("http://twitter-search-proxy.herokuapp.com/search/tweets").setQueryParameter("q", query).get();
+    public static F.Promise&lt;JsonNode&gt; fetchTweets(String query) {
+        F.Promise&lt;WSResponse&gt; responsePromise = TweetWS.url("http://twitter-search-proxy.herokuapp.com/search/tweets").setQueryParameter("q", query).get();
         //can also map using method references - WSResponse::asJson
         return responsePromise
             .filter(response -> response.getStatus() == Http.Status.OK)
@@ -617,7 +620,10 @@ public class TweetService extends AbstractActor {
     }
 
     public static final class LoadTweet implements Serializable {
-        private final String query;
+        private String query;
+
+        public LoadTweet() {
+        }
 
         public LoadTweet(String query) {
             this.query = query;
@@ -630,6 +636,9 @@ public class TweetService extends AbstractActor {
 
     public static final class NextTweet implements Serializable {
         private JsonNode nextTweet;
+
+        public NextTweet() {
+        }
 
         public NextTweet(JsonNode nextTweet) {
             this.nextTweet = nextTweet;
@@ -688,23 +697,47 @@ public class TweetService extends AbstractActor {
 
     <p><a href="#code/app/actors/UserActor.java" class="shortcut">/app/actors/UserActor.java</a> currently calls back into the Tweets Controller methods to fetch tweets.  Change the code so that it gets a reference the Tweet Service Actor and call it to fetch tweets:</p>
 
-    <p><b>1. </b>Update the constructor and props to take a reference to the TweetService as parameter by updating and adding the following lines:</p>
+    <p><b>1.</b>Update the props of UserActor to take a reference to the TweetService as parameter by updating and adding the following lines:</p>
  
  <code><pre>
 
+    //First add an import for TweetService at the top
+    import backend.TweetService;
+
+    //add a reference to the tweetServiceClient that will be set when this actor is created.
     private final ActorRef tweetServiceClient;
 
+    //Change the existing props metho to refrence the tweetServiceClient
     public static Props props(ActorRef out, ActorRef tweetServiceClient) {
         return Props.create(UserActor.class, () -> new UserActor(out, tweetServiceClient));
     }
+ </pre></code>
 
+ <p><b>2.</b>And Again inside <a href="#code/app/actors/UserActor.java" class="shortcut">/app/actors/UserActor.java</a>Update the constructor to a reference the tweetServiceClient and update the message handler to process the new tweets from the Tweet Service by adding an additional match block in the constructor:</p>
+ 
+ <code><pre>
+    //Update the constructor of UserActor to take a reference to tweetServiceClient
     public UserActor(ActorRef out, ActorRef tweetServiceClient) {
         this.out = out;
         this.tweetServiceClient = tweetServiceClient;
 
+        receive(ReceiveBuilder.
+            //A json message is from the client so parse it to get the query and fetch the tweets.
+            match(JsonNode.class, jsonNode -> {
+                String query = jsonNode.findPath("query").textValue();
+                optQuery = Optional.of(query);
+                runFetchTweets(query);
+            }).
+            match(TweetService.NextTweet.class, nextTweet -> out.tell(nextTweet.getNextTweet(), self())).
+            //The Update message is sent from the scheduler.  When the Actor receives the
+            //message fetch the tweets only if there is a query from the user.
+            match(Update.class, update -> optQuery.ifPresent(this::runFetchTweets)).
+            matchAny(o -> System.out.println("received unknown message")).build()
+        );
+    }
  </pre></code>
 
-    <p><b>2. </b>Change the FetchTweets handler to use the tweetServiceClient actor reference:</p>
+   <p><b>3.</b>Also inside <a href="#code/app/actors/UserActor.java" class="shortcut">/app/actors/UserActor.java</a>  Change the method runFetchTweets to use the tweetServiceClient actor reference and remove the callback:</p>
  
  <code><pre>
     private void runFetchTweets(String query) {
@@ -712,15 +745,15 @@ public class TweetService extends AbstractActor {
     }
  </pre></code>
 
- <p><b>3. </b>Add a message handler that processes the new tweets from the Tweet Service by adding a match block:</p>
- 
- <code><pre>
-        match(TweetService.NextTweet.class, nextTweet -> out.tell(nextTweet.getNextTweet(), self())).
- </pre></code>
 
 <p><b>4. </b>Update the creation of the UserActor in <a href="#code/app/controllers/Tweets.java" class="shortcut">app/controllers/Tweets.java</a> to reference the tweet service:</p>
 
 <code><pre>
+    //First add an import for the Actors plugin at the top
+    import actors.Actors;
+
+
+     //Change the WebSocket creation to reference the tweetServiceClient
     return WebSocket.withActor(out -> UserActor.props(out, Actors.tweetServiceClient()));
 </pre></code>
 
@@ -759,7 +792,7 @@ akka {
 }
 </pre></code>
 
-<p><b>2. </b>A Java main application has already been created in <a href="#code/app/backend/MainClusterManager.java" class="shortcut">app/backend/MainClusterManager.java</a>  that will be used to start a stand-alone Akka cluster node.  It uses a Java main to start-up and create an Akka actor system running on a different port from the Play Akka System:</p>
+<p><b>2. </b>A Java main application has already been created in <a href="#code/app/backend/MainClusterManager.java" class="shortcut">app/backend/MainClusterManager.java</a>  that will be used to start a stand-alone Akka cluster node.  It uses a Java main to start-up and create an Akka actor system running on a different port from the Play Akka System (this code was already added):</p>
 
 <code><pre>
     ActorSystem.create("application", config);
@@ -771,7 +804,7 @@ akka {
     addCommandAlias("rb", "runMain backend.MainTweetLoader 2552 -Dakka.remote.netty.tcp.port=2552 -Dakka.cluster.roles.0=backend-loader")
  </pre></code>
 
-<p><b>4. </b>Test out the changes.  First completely shutdown the play server and restart it.  Then in a separate terminal window start an instance of the backend service by running:</p>
+<p><b>4. </b>Test out the changes.  First completely shutdown the play server and restart it. Then in a separate terminal window start an instance of the backend service by running:</p>
  
     <code><pre>
   activator rb
@@ -779,7 +812,9 @@ akka {
 
 <p>The backend node can be stopped by simply typing a 's' and hitting enter in the terminal window.
 
- <p>You should see in the log output of the terminal windows the cluster being started and the backend joining into the cluster.  In the play log you should see something similar to:</p>
+ <p>Refresh the web page - this is critical because Play doesn't start the Akka System until after the first run - <a href="http://localhost:9000" target="_blank">http://localhost:9000</a></p>
+
+    <p>You should see in the log output of the terminal windows the cluster being started and the backend joining into the cluster.  In the play log you should see something similar to:</p>
 <code><pre>
 [INFO] [09/27/2014 11:52:01.264] [application-akka.actor.default-dispatcher-16] [Cluster(akka://application)] Cluster Node [akka.tcp://application@127.0.0.1:2551] - Leader is moving node [akka.tcp://application@127.0.0.1:2551] to [Up]
 [INFO] [09/27/2014 11:52:25.133] [application-akka.actor.default-dispatcher-14] [Cluster(akka://application)] Cluster Node [akka.tcp://application@127.0.0.1:2551] - Node [akka.tcp://application@127.0.0.1:2560] is JOINING, roles [backend]
@@ -814,9 +849,10 @@ akka {
         }
     </pre></code>
 
-     <p><b>2. </b>Update the akka configuration to add a router that uses the tweet service by updating <a href="#code/conf/application.conf" class="shortcut">/conf/application.conf</a> to add the following config:</p>
+     <p><b>2. </b>Update the akka configuration to add a router that uses the tweet service by updating the akka config section of <a href="#code/conf/application.conf" class="shortcut">/conf/application.conf</a> to add the following config (put it inside the akka { config block):</p>
 
  <code><pre>
+ #add this inside the akka { section of the config   
  actor.deployment {
     # Routing to the tweetLoader using a cluster router
     # By making the router a group it will look for an existing instance of the tweetLoader actor
