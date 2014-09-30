@@ -620,6 +620,7 @@ public class TweetService extends AbstractActor {
 
     public static final class LoadTweet implements Serializable {
         private String query;
+        private static final long serialVersionUID = 101L;
 
         public LoadTweet() {
         }
@@ -635,6 +636,7 @@ public class TweetService extends AbstractActor {
 
     public static final class NextTweet implements Serializable {
         private JsonNode nextTweet;
+        private static final long serialVersionUID = 101L;
 
         public NextTweet() {
         }
